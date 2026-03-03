@@ -1,0 +1,14 @@
+# .gitignore
+__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
+novel_data/
+test_data/
+.venv/
+venv/
+ENV/
+env/
+.env
+*.pdf
+input_v*.json
