@@ -134,6 +134,13 @@ def is_generic_name(name: str) -> bool:
     # 这些保留，因为在故事中是具体角色
     if name in pure_titles:
         return False
+        
+    # 如果名字里还包含乱七八糟的符号，或者太长，说明不是正常人名
+    if re.search(r'[（）()\[\]【】<>《》“”,，。:：？?！!\n\t\r]', name):
+        return True
+    if len(name) > 8 or len(name) < 1:
+        return True
+        
     return False
 
 
@@ -150,17 +157,28 @@ class ProfileGenerator:
         self.vol_data_cache: Dict[int, Dict] = {}
     
     def _parse_name_and_annotation(self, raw_name: str) -> Tuple[str, str]:
-        """解析名称和注释"""
+        """解析名称和注释，并清理脏字符"""
         raw_name = raw_name.strip()
         annotation = ""
         name = raw_name
-        for opener, closer in [("（", "）"), ("(", ")")]:
+        
+        # 处理常见的括号包裹，例如：名字（注释）或 名字(注释)
+        for opener, closer in [("（", "）"), ("(", ")"), ("【", "】"), ("[", "]")]:
             if opener in raw_name:
                 idx = raw_name.index(opener)
                 name = raw_name[:idx].strip()
                 end_idx = raw_name.index(closer) if closer in raw_name else len(raw_name)
                 annotation = raw_name[idx+1:end_idx].strip()
                 break
+        
+        # 兜底清理：如果在上一步没有找到opener，但末尾带了closer（比如“名字）”）
+        for closer in ["）", ")", "】", "]"]:
+            if name.endswith(closer):
+                name = name[:-1].strip()
+                
+        # 移除任何前缀的特殊符号（如-、*、#）
+        name = re.sub(r'^[-*#\s]+', '', name)
+        
         return name, annotation
     
     def _infer_personality(self, name: str, annotations: List[str], events: List[Dict], identity: str) -> List[str]:

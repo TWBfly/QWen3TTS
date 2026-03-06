@@ -216,7 +216,7 @@ class NovelProjectSetup:
         # 创建目录结构
         dirs = [
             self.data_dir,
-            self.data_dir / "story_bible",
+            self.data_dir / "bibles",
             self.data_dir / "volume_plans",
             self.data_dir / "character_profiles",
             self.data_dir / "quality_reports",
@@ -295,7 +295,7 @@ class BatchGenerationManager:
             json.dump(state, f, ensure_ascii=False, indent=2)
     
     def get_batch_prompt(self, batch_num: int) -> str:
-        """生成第 N 批的完整 prompt"""
+        """生成第 N 批的完整 prompt（含进化系统注入）"""
         start_vol = (batch_num - 1) * self.BATCH_SIZE + 1
         end_vol = batch_num * self.BATCH_SIZE
         
@@ -307,6 +307,9 @@ class BatchGenerationManager:
         
         # 加载核心人物设定库
         character_bible = self._load_character_bible(batch_num)
+        
+        # === 进化系统注入 ===
+        evolution_sections = self._build_evolution_sections(batch_num)
         
         prompt = f"""你是一名经验丰富的小说作家，严格以人物为核心，必须以人物推动剧情。
 
@@ -327,6 +330,8 @@ class BatchGenerationManager:
 {character_bible}
 
 {lookback}
+
+{evolution_sections}
 
 {constraints}
 
@@ -355,6 +360,46 @@ class BatchGenerationManager:
 现在请生成第 {start_vol} 卷到第 {end_vol} 卷的详细大纲："""
         
         return prompt
+
+    def _build_evolution_sections(self, batch_num: int) -> str:
+        """构建进化系统的三段注入内容"""
+        sections = []
+        try:
+            # 1. 历史教训（错题本）
+            from mechanisms.negative_memory import NegativeMemory
+            neg = NegativeMemory()
+            lessons = neg.get_lessons(top_k=5)
+            if lessons:
+                sections.append(lessons)
+
+            # 2. 生成前反思
+            from mechanisms.reflection import ReflectionEngine
+            ref = ReflectionEngine()
+            reflection = ref.generate_reflection(self.novel_name, batch_num)
+            if reflection:
+                sections.append(reflection)
+
+            # 3. 跨作品经验
+            from mechanisms.meta_rag import MetaRAG
+            meta = MetaRAG()
+            tags = self.analysis.get('tags', ['群像'])
+            cross = meta.query_cross_novel(self.novel_name, batch_num, tags)
+            if cross:
+                sections.append(cross)
+
+            # 4. 高分案例 Few-Shot（每5卷注入一次，避免 Prompt 过长）
+            if batch_num % 5 == 1 or batch_num <= 3:
+                from mechanisms.positive_memory import PositiveMemory
+                pos = PositiveMemory()
+                exemplars = pos.get_exemplars(tags=tags, top_k=1, exclude_novel=self.novel_name)
+                if exemplars:
+                    sections.append(exemplars)
+
+        except Exception as e:
+            # 进化系统不应阻塞主流程
+            sections.append(f"<!-- 进化系统加载异常: {e} -->")
+
+        return "\n".join(sections)
     
     def _load_character_bible(self, batch_num: int) -> str:
         """加载核心人物设定库并注入到 prompt 中
@@ -484,6 +529,7 @@ class BatchGenerationManager:
 9. 反派没有绝对的恶,立意高远,都是为了自己认为正确的事情
 10. 大结局(第100卷)必须是一切都是人在背后操控,非天道/命运
 11. 【新登场人物】中每个角色必须有具体的姓名（2-3字中文名），严禁出现泛指（如"帝国将军""敌方提督"），严禁出现集体名词（如"全城军民""千万学子"），严禁出现非人类实体（如"AI""机甲""战堡"）
+12. 必须且只能使用 IDE 中多 agent team 协作生成，严禁使用 local LLM server（Ollama, AI Studio 或 API Key 等）。
 
 【🔴 红线警告：卷数必须绝对完整 🔴】
 你每次都必须且**只能生成整整 {self.BATCH_SIZE} 卷**（即包含标题 `## 第X卷` 到 `## 第Y卷` 的所有内容）！
@@ -495,19 +541,23 @@ class BatchGenerationManager:
 
 {Config.SCENE_DEPTH_RULES}
 
+{Config.POWER_SCALING_RULES}
+
+{Config.NARRATIVE_QUALITY_RULES}
+
 {Config.NARRATIVE_SPOTLIGHT_RULES}
 
 【🔴 红线警告：世界观锁死 🔴】
 本小说的背景设定为「架空古代」，从第1卷到第100卷必须始终处于同一个古代世界观之下。
-严禁出现以下任何元素（即便是用"古代化包装"也严禁）：
+严禁出现以下任何元素（即便是用"古代化包装"或"机关包装"也严禁）：
 ❌ 太空/星际元素：星舰、飞船、战堡、星球大战、跃迁、FTL、银河
-❌ 高科技元素：AI、机甲、激光、暗物质、量子、机器人、虚拟现实
-❌ 维度/位面元素：高维、低维、平行世界、位面穿梭、天网、矩阵
-❌ 系统/游戏元素：系统面板、属性值、升级、天道系统
+❌ 高科技元素：AI、机甲、机关高达、激光、暗物质、量子、机器人、机甲炼狱、齿轮核心
+❌ 维度/异常元素：高维、低维、平行世界、位面穿梭、深渊、克苏鲁、异形、深渊水晶
+❌ 系统/生化元素：系统面板、升级、生化、变异、丧尸、活尸、瓦斯、水晶、抗体、生化兵工厂
 ❌ 西方科幻实体：利维坦、赛博朋克、纳米机器人
-后期（卷51+）的终极大敌必须是「人」而非超自然实体或AI系统。
-终极冲突必须是「理念之争」「路线之争」「人心博弈」，而非打败外星入侵者或摧毁AI。
-幕后黑手必须是有名有姓的人物，而非抽象概念（天道/命运/系统）。"""
+后期（卷51+）的终极大敌必须是「人」而非超自然神明、AI系统或深渊渊主。
+终极冲突必须是「理念之争」「路线之争」「人心博弈」，而非单纯打败外星/变异入侵者。
+幕后黑手必须是有名有姓且有政治/军事目的的人物，而非抽象概念（天道/命运/系统）。"""
         return base
 
     def save_batch_output(self, batch_num: int, content: str):
@@ -584,7 +634,7 @@ cd {Path(__file__).parent} && python run_novel.py --reference "{reference_path}"
 ```bash
 cd {Path(__file__).parent} && python run_novel.py --reference "{reference_path}" --output "{output_path}" --step characters
 ```
-使用上面生成的 prompt（位于 `{data_dir}/character_profiles/character_bible_prompt.md`），创作 20 个核心人物的详细设定，然后执行:
+**铁律要求**: 使用上面生成的 prompt（位于 `{data_dir}/character_profiles/character_bible_prompt.md`），并且**必须使用 IDE 中模型多 agent team 协作，严禁依赖 local LLM server（Ollama 或 AI studio 或 API key）**来创作 20 个核心人物的详细设定，然后执行:
 
 #### 1b. 保存人物设定库
 // turbo
@@ -606,7 +656,8 @@ cd """ + str(Path(__file__).parent) + f""" && python run_novel.py --reference "{
 *(注意：请将上面命令中的 `N` 替换为当前的卷号 1, 2, 3...)*
 
 #### 2. 生成大纲内容
-读取上一步生成的 `{data_dir}/volume_plans/batch_N_prompt.md`，然后为你自己创建一个任务，根据 prompt 创作该卷（10章）的详细大纲内容。
+读取上一步生成的 `{data_dir}/volume_plans/batch_N_prompt.md`。然后为你自己创建一个任务，根据 prompt 创作该卷（10章）的详细大纲内容。
+**铁律要求**: 必须使用 IDE 中模型多 agent team 协作完成该任务，绝对严禁使用 local LLM server（Ollama 或 AI studio 或 API key）。
 
 #### 3. 保存并检查
 将你生成的大纲内容保存为 `{data_dir}/volume_plans/batch_N_draft.md`，然后执行保存和检查命令：
@@ -637,6 +688,31 @@ cd """ + str(Path(__file__).parent) + f""" && python run_novel.py --output "{out
 // turbo
 ```bash
 cd """ + str(Path(__file__).parent) + f""" && python run_novel.py --output "{output_path}" --step continuity-check
+```
+
+### 步骤 15: 终局大纲深度体检与修复评估
+当 100 卷（1000章）生成完毕后，执行终局评价脚本。该脚本将生成极度严格的结构审查 Prompt，请 AI 读取大纲全文并输出诊断修改报告：
+// turbo
+```bash
+cd """ + str(Path(__file__).parent) + f""" && python run_novel.py --output "{output_path}" --step final-review
+```
+```
+使用上述命令生成的 `{data_dir}/quality_reports/final_review_prompt.md` 作为输入指令，为你自己创建一个任务，审查最终输出的大纲文件 `{output_path}`，直接定位硬伤断层并打分。
+**铁律要求**: 必须使用 IDE 中模型多 agent team 协作，严禁使用 local LLM server（Ollama 或 AI studio 或 API key）。
+
+### 步骤 16: 完结经验沉淀（自我进化）
+当终局审查通过后，执行经验沉淀命令，将本书的创作经验写入全局知识库，供后续小说使用：
+// turbo
+```bash
+cd """ + str(Path(__file__).parent) + f""" && python run_novel.py --output "{output_path}" --step evolve-summary
+```
+读取生成的 `{data_dir}/quality_reports/evolve_summary_prompt.md`，由 IDE Agent 执行深度总结并反馈。
+
+### 步骤 17: 查看进化统计面板
+随时可以执行此命令查看自我进化系统的整体状态：
+// turbo
+```bash
+cd """ + str(Path(__file__).parent) + f""" && python run_novel.py --output "{output_path}" --step evolve-stats
 ```
 """
         return workflow
@@ -705,7 +781,7 @@ def main():
     parser.add_argument("--setting", type=str, default="架空古代", help="背景设定")
     parser.add_argument("--tags", type=str, default="群像", help="标签 (逗号分隔)")
     parser.add_argument("--output", type=str, help="输出文件路径")
-    parser.add_argument("--step", type=str, choices=["setup", "characters", "save-characters", "prompt", "save", "validate", "profiles", "poison-scan", "continuity-check", "status"],
+    parser.add_argument("--step", type=str, choices=["setup", "characters", "save-characters", "prompt", "save", "validate", "profiles", "poison-scan", "continuity-check", "final-review", "evolve-summary", "evolve-stats", "status"],
                        help="执行特定步骤")
     parser.add_argument("--batch", type=int, help="批次号 (1-100)")
     parser.add_argument("--content-file", type=str, help="内容文件路径 (用于 save 步骤)")
@@ -781,6 +857,18 @@ def main():
     
     if args.step == "continuity-check":
         _run_continuity_check(args.output)
+        return
+        
+    if args.step == "final-review":
+        _run_final_review(novel_name, args.output, data_dir)
+        return
+    
+    if args.step == "evolve-summary":
+        _run_evolve_summary(novel_name, args.output, data_dir, tags)
+        return
+    
+    if args.step == "evolve-stats":
+        _show_evolution_stats()
         return
     
     # ===== 完整初始化流程 =====
@@ -921,12 +1009,20 @@ def _validate_content(content: str, batch_num: int = 0) -> tuple:
     report_lines = []
     total_hits = 0
     
-    # 1. 禁词扫描
+    # 1. 禁词扫描（合并进化禁词）
+    try:
+        from mechanisms.config_evolver import ConfigEvolver
+        evolver = ConfigEvolver()
+        all_forbidden = evolver.get_all_forbidden_concepts()
+    except Exception:
+        all_forbidden = Config.FORBIDDEN_CONCEPTS
+    
     forbidden_hits = []
-    for concept in Config.FORBIDDEN_CONCEPTS:
+    for concept in all_forbidden:
         count = content.count(concept)
         if count > 0:
-            forbidden_hits.append(f"  ❌ \"{concept}\" 出现 {count} 次")
+            evolved_tag = " [进化新增]" if concept not in Config.FORBIDDEN_CONCEPTS else ""
+            forbidden_hits.append(f"  ❌ \"{concept}\" 出现 {count} 次{evolved_tag}")
             total_hits += count
     
     if forbidden_hits:
@@ -988,7 +1084,7 @@ def _validate_content(content: str, batch_num: int = 0) -> tuple:
 
 
 def _save_batch(data_dir: Path, output_path: str, batch_num: int, content_file: str, novel_name: str):
-    """保存一批生成的内容（含验证门禁与 AI 连贯性校验）"""
+    """保存一批生成的内容（含验证门禁、AI 连贯性校验及进化系统反馈闭环）"""
     if not batch_num or not content_file:
         print("请指定 --batch 和 --content-file 参数")
         return
@@ -1001,6 +1097,39 @@ def _save_batch(data_dir: Path, output_path: str, batch_num: int, content_file: 
     print(report)
     
     if not passed:
+        # === 进化系统：记录失败到错题本 + 触发配置进化 ===
+        try:
+            from mechanisms.negative_memory import NegativeMemory
+            from mechanisms.config_evolver import ConfigEvolver
+            
+            neg = NegativeMemory()
+            # 提取命中的禁词
+            from config import Config
+            hit_words = [c for c in Config.FORBIDDEN_CONCEPTS if c in content]
+            
+            # 判断错误类型
+            if "缺失卷号" in report or "漏卷" in report:
+                error_type = "missing_volume"
+            elif "角色名违规" in report:
+                error_type = "character_name"
+            else:
+                error_type = "forbidden_word"
+            
+            neg.record_failure(
+                novel_name=novel_name,
+                batch_num=batch_num,
+                error_type=error_type,
+                details=report,
+                forbidden_words_hit=hit_words,
+                content_snippet=content[:200]
+            )
+            
+            # 触发配置热生长
+            evolver = ConfigEvolver()
+            evolver.learn_new_pattern(content, error_type, report)
+        except Exception as e:
+            print(f"   ⚠️ 进化系统记录异常 (不影响主流程): {e}")
+        
         print(f"\n🚫 保存被拒绝! 请修复上述违规后重新执行 save。")
         sys.exit(1)
         
@@ -1017,11 +1146,40 @@ def _save_batch(data_dir: Path, output_path: str, batch_num: int, content_file: 
     print(ai_report)
     
     if not ai_passed:
+        # === 进化系统：AI 驳回也记入错题本 ===
+        try:
+            from mechanisms.negative_memory import NegativeMemory
+            neg = NegativeMemory()
+            neg.record_failure(
+                novel_name=novel_name,
+                batch_num=batch_num,
+                error_type="ai_rejected",
+                details=ai_report,
+                content_snippet=content[:200]
+            )
+        except Exception:
+            pass
+        
         print(f"\n🚫 AI主编驳回! 请根据上面的修改建议修复漏洞后重新执行 save。")
         sys.exit(1)
     
+    # === 保存成功 ===
     batch_mgr = BatchGenerationManager(data_dir, output_path, {}, "")
     batch_mgr.save_batch_output(batch_num, content)
+    
+    # === 进化系统：收录高分案例 ===
+    try:
+        from mechanisms.positive_memory import PositiveMemory
+        pos = PositiveMemory()
+        pos.record_success(
+            novel_name=novel_name,
+            batch_num=batch_num,
+            draft_snippet=content,
+            tags=["群像", "架空古代"],
+            score=100
+        )
+    except Exception as e:
+        print(f"   ⚠️ 高分案例收录异常 (不影响主流程): {e}")
 
 
 def _run_validate(batch_num: int, content_file: str):
@@ -1118,6 +1276,7 @@ def _generate_character_prompt(data_dir: Path, output_path: str, novel_name: str
 5. 所有人物的诉求必须基于合理的身世和动机，严禁脸谱化
 6. 人物之间必须有多维度的交叉关系（盟友/敌对/暧昧/师徒等）
 7. 20个人物必须分布在九条叙事线上，每条线至少2个核心人物
+8. 必须且只能使用 IDE 中多 agent team 协作生成此人物设定库，严禁使用 local LLM server（Ollama, AI Studio 或 API Key 等）。
 
 【输出格式】请严格按照以下格式输出：
 
@@ -1186,7 +1345,8 @@ def _generate_character_prompt(data_dir: Path, output_path: str, novel_name: str
     print(prompt[:800])
     print(f"...(共 {len(prompt)} 字符)")
     print(f"\n👉 下一步: ")
-    print(f"   1. 使用 IDE Agent 根据此 prompt 生成人物设定")
+    print(f"   1. 使用 IDE 中模型多 agent team 协作，根据此 prompt 生成人物设定")
+    print(f"      (严禁使用 local LLM server/Ollama/AI studio/API key)")
     print(f"   2. 将生成的内容保存为草稿文件")
     print(f"   3. 执行: python run_novel.py --output \"{output_path}\" --step save-characters --content-file <草稿文件路径>")
 
@@ -1271,7 +1431,7 @@ def _run_poison_scan(novel_name: str):
 
 
 def _run_continuity_check(output_path: str):
-    """运行连贯性检查"""
+    """运行连贯性检查 (基于已生成的大纲文本)"""
     if not os.path.exists(output_path):
         print(f"❌ 输出文件不存在: {output_path}")
         return
@@ -1279,6 +1439,7 @@ def _run_continuity_check(output_path: str):
     with open(output_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
+    import re
     # 检查卷数完整性
     volumes_found = re.findall(r'## 第(\d+)卷', content)
     vol_nums = sorted([int(v) for v in volumes_found])
@@ -1309,6 +1470,148 @@ def _run_continuity_check(output_path: str):
         print(f"   ⚠️ 禁词出现: {', '.join(forbidden_hits)}")
     else:
         print(f"   ✅ 无禁词")
+
+def _run_final_review(novel_name: str, output_path: str, data_dir: Path):
+    """运行终局大纲深度体检与修复评估"""
+    print(f"\n🔍 [终局大纲审查] 正在生成《{novel_name}》 100 卷最终评估 Prompt...")
+    
+    try:
+        from scripts.final_reviewer import generate_review_prompt
+        prompt_content = generate_review_prompt(novel_name, output_path)
+        
+        report_dir = data_dir / "quality_reports"
+        report_dir.mkdir(parents=True, exist_ok=True)
+        
+        prompt_file = report_dir / "final_review_prompt.md"
+        with open(prompt_file, 'w', encoding='utf-8') as f:
+            f.write(prompt_content)
+            
+        print(f"✅ 终局审查 Prompt 已生成: {prompt_file}\n")
+        print(f"👉 请指示 IDE（AI）读取此 Prompt 内容，并对大纲文件 ({output_path}) 执行全方位终极无情审查与评分！")
+        
+    except Exception as e:
+        print(f"❌ 生成终局审查 Prompt 失败: {e}")
+
+def _run_evolve_summary(novel_name: str, output_path: str, data_dir: Path, tags: list):
+    """完结经验沉淀：将一本已完成小说的关键经验写入全局知识库"""
+    print(f"\n🧠 [经验沉淀] 正在为《{novel_name}》生成创作经验总结...")
+    
+    from mechanisms.meta_rag import MetaRAG
+    meta = MetaRAG()
+    
+    # 生成总结 Prompt 供 IDE Agent 使用
+    prompt = meta.generate_novel_summary_prompt(novel_name, output_path)
+    
+    report_dir = data_dir / "quality_reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    
+    prompt_file = report_dir / "evolve_summary_prompt.md"
+    with open(prompt_file, 'w', encoding='utf-8') as f:
+        f.write(prompt)
+    
+    # 同时自动注册一条基础记录（即使 IDE Agent 不执行总结，系统也有基础记忆）
+    try:
+        # 读取输出文件获取基础统计
+        total_vols = 0
+        if os.path.exists(output_path):
+            with open(output_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            import re as _re
+            total_vols = len(_re.findall(r'## 第\d+卷', content))
+        
+        # 从错题本获取教训
+        from mechanisms.negative_memory import NegativeMemory
+        neg = NegativeMemory()
+        neg_stats = neg.get_stats()
+        learnings = []
+        if neg_stats.get("top_forbidden"):
+            top_words = [w for w, c in neg_stats["top_forbidden"][:3]]
+            learnings.append(f"最常犯的禁词错误：{'、'.join(top_words)}，需要在后续创作中彻底回避。")
+        if neg_stats.get("by_type", {}).get("missing_volume", 0) > 0:
+            learnings.append("曾出现卷号缺失问题，后续必须严格校验输出完整性。")
+        if not learnings:
+            learnings.append("本次创作过程相对顺利，校验通过率高。")
+        
+        meta.register_novel_completion(
+            novel_name=novel_name,
+            setting="架空古代",
+            tags=tags,
+            total_volumes=total_vols,
+            key_learnings=learnings,
+            best_techniques=["群像叙事交织", "伏笔层层递进"],
+            character_insights=["角色矛盾面塑造是群像小说核心驱动力"]
+        )
+    except Exception as e:
+        print(f"   ⚠️ 基础记录注册异常: {e}")
+    
+    print(f"✅ 经验沉淀 Prompt 已生成: {prompt_file}")
+    print(f"👉 请指示 IDE Agent 读取此 Prompt，执行深度总结后将结果反馈回系统。")
+    print(f"   基础经验已自动注册到全局知识库。")
+
+
+def _show_evolution_stats():
+    """显示自我进化系统的统计面板"""
+    print(f"\n{'='*60}")
+    print(f"         🧬 自我进化系统统计面板")
+    print(f"{'='*60}")
+    
+    # 1. 错题本
+    try:
+        from mechanisms.negative_memory import NegativeMemory
+        neg = NegativeMemory()
+        neg_stats = neg.get_stats()
+        print(f"\n📝 错题本:")
+        print(f"   累计失败记录: {neg_stats['total']} 次")
+        if neg_stats.get("by_type"):
+            for t, c in neg_stats["by_type"].items():
+                print(f"   - {t}: {c} 次")
+        if neg_stats.get("top_forbidden"):
+            words = ", ".join([f"{w}(×{c})" for w, c in neg_stats["top_forbidden"][:5]])
+            print(f"   高频禁词: {words}")
+    except Exception as e:
+        print(f"   ⚠️ 加载失败: {e}")
+    
+    # 2. 高分案例库
+    try:
+        from mechanisms.positive_memory import PositiveMemory
+        pos = PositiveMemory()
+        pos_stats = pos.get_stats()
+        print(f"\n⭐ 高分案例库:")
+        print(f"   收录案例: {pos_stats['total']} 个")
+        print(f"   平均得分: {pos_stats['avg_score']}")
+        if pos_stats.get("novels"):
+            print(f"   覆盖小说: {', '.join(pos_stats['novels'])}")
+    except Exception as e:
+        print(f"   ⚠️ 加载失败: {e}")
+    
+    # 3. 配置进化
+    try:
+        from mechanisms.config_evolver import ConfigEvolver
+        evolver = ConfigEvolver()
+        evo_stats = evolver.get_stats()
+        print(f"\n🧬 配置热生长:")
+        print(f"   进化新增禁词: {evo_stats['evolved_words_count']} 个")
+        print(f"   候选观察词: {evo_stats['candidate_count']} 个")
+        print(f"   进化事件: {evo_stats['evolution_events']} 次")
+        evolved = evolver.get_evolved_forbidden_words()
+        if evolved:
+            print(f"   新增禁词列表: {', '.join(evolved)}")
+    except Exception as e:
+        print(f"   ⚠️ 加载失败: {e}")
+    
+    # 4. 跨小说知识图谱
+    try:
+        from mechanisms.meta_rag import MetaRAG
+        meta = MetaRAG()
+        meta_stats = meta.get_stats()
+        print(f"\n🌐 跨小说知识图谱:")
+        print(f"   已完成小说: {meta_stats['completed_novels']} 本")
+        print(f"   叙事技法: {meta_stats['techniques_count']} 条")
+        print(f"   角色原型: {meta_stats['archetypes_count']} 条")
+    except Exception as e:
+        print(f"   ⚠️ 加载失败: {e}")
+    
+    print(f"\n{'='*60}")
 
 
 if __name__ == "__main__":
