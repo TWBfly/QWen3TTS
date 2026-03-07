@@ -45,56 +45,19 @@ class Config:
     SHADOW_REGISTRY_MIN_CHAPTERS = 10  # Increased for slower pacing
     
     # 故事约束配置 (Strictly Enforced)
-    # BASE_FORBIDDEN_CONCEPTS: 全局通用禁词（与世界观无关的写作禁忌）
-    BASE_FORBIDDEN_CONCEPTS = [
-        # === 叙事手法禁词（所有世界观通用） ===
-        "机械降神", "金手指", "空间戒指", "属性板", "穿越者", "直播", "天道", "系统", "面板",
-    ]
+    # 禁词已统一由 worldview.py 管理，此处不再维护硬编码列表
+    # 向后兼容：FORBIDDEN_CONCEPTS 属性通过 WorldviewEngine 动态获取
+    # （poison_detector 等模块级初始化仍可使用此属性）
+    @staticmethod
+    def _init_default_forbidden():
+        """模块加载时初始化默认禁词（架空古代）"""
+        try:
+            from worldview import WorldviewEngine
+            return WorldviewEngine.from_setting("架空古代").get_forbidden_elements()
+        except Exception:
+            return []  # 模块加载阶段的安全回退
     
-    # 架空古代专属禁词（保留用于向后兼容和默认场景）
-    _FORBIDDEN_CONCEPTS_ARCHAIC = [
-        # === 原有禁词 ===
-        "科幻", "星际", "AI", "程序", "物理宇宙", "数据流", "锚点", 
-        "外星人", "银河系", "宇宙", "时间旅行", "平行世界", "维度", "位面",
-        "逻辑武器", "科幻修仙", "缸中之脑",
-        # === 星际/太空类 ===
-        "星舰", "战舰", "飞船", "星球", "星区", "星域", "跃迁", "光年",
-        "旗舰", "战堡", "歼星", "舰队", "舰长", "旗舰甲板", "太空", "火箭",
-        # === 高科技类 ===
-        "机甲", "激光", "暗物质", "量子", "黑洞", "引擎", "机器人", "克隆",
-        "纳米", "赛博", "虚拟现实", "全息", "电子", "芯片", "半机械",
-        "防火墙", "数据", "网络", "服务器", "代码", "蒸汽", "辐射",
-        # === 高维/矩阵类 ===
-        "高维", "低维", "天网", "矩阵", "熔炉", "休眠舱", "能量阀",
-        "格式化", "主机", "覆写", "脉冲", "扫描仪",
-        # === 具体违规实体 ===
-        "利维坦", "清道夫", "守门人",
-        # === 末日/生化/科幻套皮 ===
-        "深渊", "怪物", "变异", "生化", "生化兵工厂", "生化学者", "变异大军", "抗体",
-        "深渊水晶", "深渊核心", "活尸", "生化关节", "高达", "机械炼狱", "齿轮核心",
-        "克苏鲁", "异形", "渊主", "神明", "丧尸", "瓦斯", "水晶",
-        "母体", "母巢", "病毒", "感染", "寄生", "共生", "宿主",
-        "触手", "基因", "进化", "异能", "意识体",
-        # === 仙侠/玄幻元素泄露（架空古代不应出现） ===
-        "修仙", "灵气", "飞剑", "法术", "阵法", "法宝", "符文", "铭文",
-        "修炼", "丹田", "元气", "飞升", "渡劫", "金丹", "元婴", "化神",
-        "结界", "封印", "虚空", "空间裂缝", "须弥", "力场",
-        "血脉觉醒", "斗气", "魔兽", "魔核", "魔力", "魔王", "召唤",
-        # === 现代武器（架空古代不应出现） ===
-        "炮弹", "炸弹", "地雷", "导弹", "机枪", "步枪", "手枪",
-        # === 系统/游戏化元素 ===
-        "升级", "等级", "经验值", "属性",
-        # === 其他违规 ===
-        "时空", "末日", "傀儡", "机关兽", "齿轮",
-    ]
-    
-    # 向后兼容：FORBIDDEN_CONCEPTS 默认为架空古代的完整禁词列表（静态）
-    FORBIDDEN_CONCEPTS = BASE_FORBIDDEN_CONCEPTS + _FORBIDDEN_CONCEPTS_ARCHAIC
-    
-    @classmethod
-    def _get_default_forbidden(cls):
-        from worldview import WorldviewEngine
-        return WorldviewEngine.from_setting("架空古代").get_forbidden_elements()
+    FORBIDDEN_CONCEPTS = _init_default_forbidden()
     
     @classmethod
     def get_forbidden_concepts(cls, setting: str = "架空古代") -> list:
@@ -200,10 +163,9 @@ class Config:
     6. 章节密度阈值校验：任何10章（1卷）内，必须发生至少1次重大势力更迭、1次生死存亡的转折、或者1次核心伏笔的重磅抛出/致命回收。严禁连篇累牍的宴会、赶路、回忆、无意义的闲聊切磋。
     """
     
-    # 整合所有约束
+    # 整合所有约束（禁止概念已由 WorldviewEngine 的 get_constraint_prompt() 动态生成，
+    # 此处不再重复包含静态禁词列表）
     STORY_CONSTRAINTS = f"""
-    【禁止概念】: {', '.join(FORBIDDEN_CONCEPTS)}
-    
     {NARRATIVE_QUALITY_RULES}
     {MULTI_THREAD_NARRATIVE_RULES}
     {SCENE_DEPTH_RULES}

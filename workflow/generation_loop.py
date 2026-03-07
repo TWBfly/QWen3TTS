@@ -104,24 +104,26 @@ class GenerationLoop:
         
         generated_outlines = []
         
+        current_arc = arc_description  # 初始化，后续每卷开头替换
+        
         for chapter_num in range(start, end + 1):
             current_volume = (chapter_num - 1) // 10 + 1
             chapter_in_volume = (chapter_num - 1) % 10 + 1
             
-            # 每卷开始前执行累计回顾 (Fix #5 + #9)
+            # 每卷开始前执行累计回顾 + 加载本卷原文（仅一次）
             if chapter_in_volume == 1:
                 self._perform_volume_start_actions(bible, current_volume)
-            
-            # 动态获取对应卷的原文作为上下文 (Fix for extracting volume content)
-            volume_text = self._extract_volume_text_from_markdown(current_volume)
-            if volume_text:
-                arc_description = f"{arc_description}\n\n==== 原文原著第 {current_volume} 卷内容参考 ====\n{volume_text}"
+                volume_text = self._extract_volume_text_from_markdown(current_volume)
+                if volume_text:
+                    current_arc = f"{arc_description}\n\n==== 原文原著第 {current_volume} 卷内容参考 ====\n{volume_text}"
+                else:
+                    current_arc = arc_description
 
             try:
                 outline = self.generate_single_chapter(
                     bible=bible,
                     chapter_number=chapter_num,
-                    arc_description=arc_description
+                    arc_description=current_arc
                 )
                 generated_outlines.append(outline)
                 

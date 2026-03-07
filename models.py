@@ -63,7 +63,9 @@ class BackgroundTheme:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
 
-# 预定义背景题材
+# [DEPRECATED] 预定义背景题材 — 已被 worldview.py 的标签引擎取代
+# 保留仅用于 StoryBible.validate() 中的向后兼容检查
+# 新代码请使用 worldview.WorldviewEngine.from_setting()
 PREDEFINED_THEMES: Dict[str, 'BackgroundTheme'] = {}
 
 

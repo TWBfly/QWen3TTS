@@ -369,10 +369,24 @@
 -将修改后的内容保存到/Users/tang/PycharmProjects/pythonProject/dagang/大王饶命_仿写.md中
 
 **创作1000 章大纲命令**
-python run_novel.py \
-  --reference /Users/tang/PycharmProjects/pythonProject/大王饶命/1/总.md \
-  --setting "架空古代" --tags "群像" \
-  --output /Users/tang/PycharmProjects/pythonProject/dagang/大王饶命_仿写_细纲.md
+请根据以下配置，修改并调用 
+
+…/.agent/workflows/generate-大王饶命.md
+（并重命名或更新其内容），然后开始执行：
+
+1. 基础配置
+[待修改] 仿写目标名称：大奉打更人_仿写
+[待修改] 原著 TXT 目录：/Users/tang/PycharmProjects/pythonProject/大奉打更人
+[待修改] 原著总纲路径：/Users/tang/PycharmProjects/pythonProject/大奉打更人/1/总.md
+[待修改] 世界观标签：古代,修仙,探案,皇权，群像
+[待修改] 输出文件路径：/Users/tang/PycharmProjects/pythonProject/dagang/大奉打更人_仿写_细纲.md
+2. AI 自动化指令
+更新 Workflow：读取现有的 generate-大王饶命.md 内容，将其中所有关于“大王饶命”的路径和名称替换为上方配置的内容，并保存到 /Users/tang/PycharmProjects/pythonProject/.agent/workflows/novel-active.md。
+启动知识提取：立即执行新 Workflow 中的**“步骤 2”**，启动 analyze_novel.py 让系统学习新小说。
+环境初始化：学习完成后，自动执行**“步骤 1”**进行新项目初始化。
+反馈进度：完成上述两步后，向我汇报提取到的叙事模式数量，并等待我确认开始生成人物设定。
+
+
 
 
   --上述问题，如何在代码中规避并修复，/Users/tang/PycharmProjects/pythonProject/QWen3TTS，/Users/tang/PycharmProjects/pythonProject/QWen3TTS/run_novel.py，/Users/tang/PycharmProjects/pythonProject/.agent/workflows/generate-大王饶命.md

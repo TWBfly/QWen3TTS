@@ -12,3 +12,4 @@ env/
 .env
 *.pdf
 input_v*.json
+knowledge_data/
