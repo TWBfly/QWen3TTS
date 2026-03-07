@@ -90,7 +90,7 @@ class ChapterDriver:
 1. **结构(Architect)**: 采用起承转合的四幕结构，节奏必须一波三折。
 2. **角色(Simulator)**: 严格遵守上述角色当前心理状态。如果角色在"隐忍"，遭遇挑衅绝对不能无脑打脸爆发，必须用符合人设的智谋化解。
 3. **编织(Weaver)**: 将【本章核心事件】自然融入，不要生硬空降。制造一个"钩子(Hook)"作为结尾。
-4. **风控(Verifier)**: 绝对禁止：{', '.join(Config.FORBIDDEN_CONCEPTS)}。严禁机械降神，严禁逻辑漏洞。
+4. **风控(Verifier)**: 绝对禁止：{', '.join(Config.get_forbidden_concepts(bible.background_theme or '架空古代'))}。严禁机械降神，严禁逻辑漏洞。
 
 请以严格的 JSON 格式返回第 {chapter_number} 章内容：
 ```json

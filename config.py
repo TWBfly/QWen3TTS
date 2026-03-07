@@ -45,28 +45,77 @@ class Config:
     SHADOW_REGISTRY_MIN_CHAPTERS = 10  # Increased for slower pacing
     
     # 故事约束配置 (Strictly Enforced)
-    FORBIDDEN_CONCEPTS = [
+    # BASE_FORBIDDEN_CONCEPTS: 全局通用禁词（与世界观无关的写作禁忌）
+    BASE_FORBIDDEN_CONCEPTS = [
+        # === 叙事手法禁词（所有世界观通用） ===
+        "机械降神", "金手指", "空间戒指", "属性板", "穿越者", "直播", "天道", "系统", "面板",
+    ]
+    
+    # 架空古代专属禁词（保留用于向后兼容和默认场景）
+    _FORBIDDEN_CONCEPTS_ARCHAIC = [
         # === 原有禁词 ===
         "科幻", "星际", "AI", "程序", "物理宇宙", "数据流", "锚点", 
         "外星人", "银河系", "宇宙", "时间旅行", "平行世界", "维度", "位面",
-        "逻辑武器", "科幻修仙", "缸中之脑", "直播", "天道", "系统", "面板", "穿越者",
-        "机械降神", "金手指", "空间戒指", "属性板",
+        "逻辑武器", "科幻修仙", "缸中之脑",
         # === 星际/太空类 ===
         "星舰", "战舰", "飞船", "星球", "星区", "星域", "跃迁", "光年",
-        "旗舰", "战堡", "歼星", "舰队", "舰长", "旗舰甲板",
+        "旗舰", "战堡", "歼星", "舰队", "舰长", "旗舰甲板", "太空", "火箭",
         # === 高科技类 ===
         "机甲", "激光", "暗物质", "量子", "黑洞", "引擎", "机器人", "克隆",
         "纳米", "赛博", "虚拟现实", "全息", "电子", "芯片", "半机械",
+        "防火墙", "数据", "网络", "服务器", "代码", "蒸汽", "辐射",
         # === 高维/矩阵类 ===
         "高维", "低维", "天网", "矩阵", "熔炉", "休眠舱", "能量阀",
         "格式化", "主机", "覆写", "脉冲", "扫描仪",
         # === 具体违规实体 ===
         "利维坦", "清道夫", "守门人",
-        # === 用户新增违禁词（末日/生化/科幻套皮） ===
+        # === 末日/生化/科幻套皮 ===
         "深渊", "怪物", "变异", "生化", "生化兵工厂", "生化学者", "变异大军", "抗体",
         "深渊水晶", "深渊核心", "活尸", "生化关节", "高达", "机械炼狱", "齿轮核心",
         "克苏鲁", "异形", "渊主", "神明", "丧尸", "瓦斯", "水晶",
+        "母体", "母巢", "病毒", "感染", "寄生", "共生", "宿主",
+        "触手", "基因", "进化", "异能", "意识体",
+        # === 仙侠/玄幻元素泄露（架空古代不应出现） ===
+        "修仙", "灵气", "飞剑", "法术", "阵法", "法宝", "符文", "铭文",
+        "修炼", "丹田", "元气", "飞升", "渡劫", "金丹", "元婴", "化神",
+        "结界", "封印", "虚空", "空间裂缝", "须弥", "力场",
+        "血脉觉醒", "斗气", "魔兽", "魔核", "魔力", "魔王", "召唤",
+        # === 现代武器（架空古代不应出现） ===
+        "炮弹", "炸弹", "地雷", "导弹", "机枪", "步枪", "手枪",
+        # === 系统/游戏化元素 ===
+        "升级", "等级", "经验值", "属性",
+        # === 其他违规 ===
+        "时空", "末日", "傀儡", "机关兽", "齿轮",
     ]
+    
+    # 向后兼容：FORBIDDEN_CONCEPTS 默认为架空古代的完整禁词列表（静态）
+    FORBIDDEN_CONCEPTS = BASE_FORBIDDEN_CONCEPTS + _FORBIDDEN_CONCEPTS_ARCHAIC
+    
+    @classmethod
+    def _get_default_forbidden(cls):
+        from worldview import WorldviewEngine
+        return WorldviewEngine.from_setting("架空古代").get_forbidden_elements()
+    
+    @classmethod
+    def get_forbidden_concepts(cls, setting: str = "架空古代") -> list:
+        """根据世界观设定返回对应的禁词列表（委托给 WorldviewEngine）"""
+        from worldview import WorldviewEngine
+        engine = WorldviewEngine.from_setting(setting)
+        return engine.get_forbidden_elements()
+    
+    @classmethod
+    def get_world_setting_prompt(cls, setting: str = "架空古代") -> str:
+        """根据世界观设定动态生成「世界观锁死」约束段落（委托给 WorldviewEngine）"""
+        from worldview import WorldviewEngine
+        engine = WorldviewEngine.from_setting(setting)
+        return engine.get_constraint_prompt()
+    
+    @classmethod
+    def get_setting_summary(cls, setting: str = "架空古代") -> str:
+        """返回世界设定的简短一行描述"""
+        from worldview import WorldviewEngine
+        engine = WorldviewEngine.from_setting(setting)
+        return engine.get_setting_summary()
     
     # 角色名禁止模式（正则列表，用于校验角色名是否为真实人物）
     FORBIDDEN_CHARACTER_PATTERNS = [
@@ -96,7 +145,7 @@ class Config:
     4. 严禁随意复活死去的角色（如被深渊等力量腐化复活等敷衍写法）。
     5. 严禁使用“主角武功尽失”、“失忆重开”、“坠崖被救”等刻意低劣的手法强行推进剧情，必须维持人物长线性格积累。
     6. 严禁使用“命运安排”、“巧合”、“天道”来解决困境。所有困境应对必须源于主动选择、利益交换或牺牲。
-    7. 风格统一：必须保持背景风格统一，必须在一个纯粹架空古代下（权谋、门阀、军阀争霸），不可出现赛博科幻或者克苏鲁修仙。
+    7. 风格统一：必须保持背景风格统一，从第1卷到第100卷必须处于同一个世界观之下，不可出现与设定矛盾的元素跨界混搭。
     """
     
     # 多线叙事约束

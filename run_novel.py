@@ -275,11 +275,12 @@ class BatchGenerationManager:
     BATCH_SIZE = 1  # 每批1卷
     TOTAL_BATCHES = 100  # 共100批 = 100卷
     
-    def __init__(self, data_dir: Path, output_path: str, analysis: dict, novel_name: str):
+    def __init__(self, data_dir: Path, output_path: str, analysis: dict, novel_name: str, setting: str = "架空古代"):
         self.data_dir = data_dir
         self.output_path = output_path
         self.analysis = analysis
         self.novel_name = novel_name
+        self.setting = setting
         self.state_file = data_dir / "generation_state.json"
         
     def get_current_state(self) -> dict:
@@ -322,8 +323,9 @@ class BatchGenerationManager:
 
 【创作设定】
 - 小说名称: {self.novel_name}（仿写）
-- 背景: 架空古代
-- 标签: 群像
+- 背景: {self.setting}
+- 标签: {', '.join(self.analysis.get('tags', ['群像']))}
+- {Config.get_setting_summary(self.setting)}
 - 不可抄袭原作内容，人物名称不可一样
 - 必须保持一个世界观
 
@@ -351,9 +353,28 @@ class BatchGenerationManager:
 **【大纲逻辑】**:
 1. ...（6-8个剧情节点）
 
-**【十章细目】**:
-- 第X章: 章名 - 核心事件 | 场景 | 关键人物
-...
+**【十章细目】**（第X章至第X章，每一章都必须、绝对必须包含以下完整格式，不可遗漏任何一项）:
+
+### 第X章：章名
+
+**场景**：（具体地点与环境氛围）
+
+**人物**：（本章登场的关键人物）
+
+**核心剧情**：（本章核心事件一句话概括）
+
+**结构拆解（三幕）**：
+
+**【第一幕/起】**：（具体动作与前情，承接上章，交代本章起点）
+
+**【第二幕/承】**：（冲突展开，矛盾激化，推动剧情发展）
+
+**【第三幕/转】**：（高潮与反转，关键转折点）
+
+**【合】**：（本章悬念与落点，为下章埋下钩子）
+
+---
+（以上格式重复10次，覆盖本卷全部10章）
 
 ---
 
@@ -516,10 +537,14 @@ class BatchGenerationManager:
             return f"【前情回顾】: ⚠️ 读取输出文件失败 ({e})，请回顾输出文件中第1~{(batch_num-1)*self.BATCH_SIZE}卷的内容。"
     
     def _build_constraints(self) -> str:
-        """构建创作约束"""
+        """构建创作约束（根据 self.setting 动态生成）"""
+        forbidden_concepts = Config.get_forbidden_concepts(self.setting)
+        world_setting_prompt = Config.get_world_setting_prompt(self.setting)
+        setting_summary = Config.get_setting_summary(self.setting)
+        
         base = f"""【创作约束 (铁律)】
-1. 严格禁止: {', '.join(Config.FORBIDDEN_CONCEPTS)}
-2. 必须: 架空古代世界观,严禁科幻/穿越/系统元素
+1. 严格禁止: {', '.join(forbidden_concepts)}
+2. 必须: {setting_summary}
 3. 必须: 三幕九线写作手法,明确九条叙事线
 4. 必须: 每个人物都是主角,都有完整弧光和高光时刻
 5. 必须: 草蛇灰线伏笔千里,前后逻辑严密闭合
@@ -547,17 +572,7 @@ class BatchGenerationManager:
 
 {Config.NARRATIVE_SPOTLIGHT_RULES}
 
-【🔴 红线警告：世界观锁死 🔴】
-本小说的背景设定为「架空古代」，从第1卷到第100卷必须始终处于同一个古代世界观之下。
-严禁出现以下任何元素（即便是用"古代化包装"或"机关包装"也严禁）：
-❌ 太空/星际元素：星舰、飞船、战堡、星球大战、跃迁、FTL、银河
-❌ 高科技元素：AI、机甲、机关高达、激光、暗物质、量子、机器人、机甲炼狱、齿轮核心
-❌ 维度/异常元素：高维、低维、平行世界、位面穿梭、深渊、克苏鲁、异形、深渊水晶
-❌ 系统/生化元素：系统面板、升级、生化、变异、丧尸、活尸、瓦斯、水晶、抗体、生化兵工厂
-❌ 西方科幻实体：利维坦、赛博朋克、纳米机器人
-后期（卷51+）的终极大敌必须是「人」而非超自然神明、AI系统或深渊渊主。
-终极冲突必须是「理念之争」「路线之争」「人心博弈」，而非单纯打败外星/变异入侵者。
-幕后黑手必须是有名有姓且有政治/军事目的的人物，而非抽象概念（天道/命运/系统）。"""
+{world_setting_prompt}"""
         return base
 
     def save_batch_output(self, batch_num: int, content: str):
@@ -603,7 +618,7 @@ class WorkflowGenerator:
     
     @staticmethod
     def generate_workflow(novel_name: str, reference_path: str, output_path: str, 
-                         data_dir: Path, analysis: dict) -> str:
+                         data_dir: Path, analysis: dict, setting: str = "架空古代", tags: str = "群像") -> str:
         """生成完整的工作流 Markdown"""
         
         workflow = f"""---
@@ -617,6 +632,7 @@ description: 一键生成 {novel_name} 仿写 100卷大纲
 - **参考小说**: {reference_path}
 - **输出文件**: {output_path}
 - **数据目录**: {data_dir}
+- **背景设定**: {setting}
 - **目标**: 100卷 × 10章/卷 = 1000章
 
 ## 执行步骤
@@ -624,7 +640,7 @@ description: 一键生成 {novel_name} 仿写 100卷大纲
 ### 步骤 0: 环境初始化 (已自动完成 ✅)
 // turbo
 ```bash
-cd {Path(__file__).parent} && python run_novel.py --reference "{reference_path}" --setting "架空古代" --tags "群像" --output "{output_path}" --step setup
+cd {Path(__file__).parent} && python run_novel.py --reference "{reference_path}" --setting "{setting}" --tags "{tags}" --output "{output_path}" --step setup
 ```
 
 ### 步骤 1: 生成核心人物设定库
@@ -840,7 +856,7 @@ def main():
         return
     
     if args.step == "characters":
-        _generate_character_prompt(data_dir, args.output, novel_name, args.reference)
+        _generate_character_prompt(data_dir, args.output, novel_name, args.reference, setting=args.setting)
         return
     
     if args.step == "save-characters":
@@ -864,7 +880,7 @@ def main():
         return
     
     if args.step == "evolve-summary":
-        _run_evolve_summary(novel_name, args.output, data_dir, tags)
+        _run_evolve_summary(novel_name, args.output, data_dir, tags, setting=args.setting)
         return
     
     if args.step == "evolve-stats":
@@ -900,7 +916,8 @@ def main():
     
     # Step 3: 生成工作流
     workflow_content = WorkflowGenerator.generate_workflow(
-        novel_name, args.reference, args.output, data_dir, analysis
+        novel_name, args.reference, args.output, data_dir, analysis,
+        setting=args.setting, tags=args.tags
     )
     
     # 保存工作流到 .agent/workflows/
@@ -917,7 +934,7 @@ def main():
         f.write(analyzer.get_analysis_summary())
     
     # Step 4: 生成第一批 prompt
-    batch_mgr = BatchGenerationManager(data_dir, args.output, serializable_analysis, novel_name)
+    batch_mgr = BatchGenerationManager(data_dir, args.output, serializable_analysis, novel_name, setting=args.setting)
     prompt = batch_mgr.get_batch_prompt(1)
     
     prompt_path = data_dir / "volume_plans" / "batch_01_prompt.md"
@@ -971,7 +988,18 @@ def _generate_prompt(data_dir: Path, output_path: str, batch_num: int, novel_nam
         with open(analysis_path, 'r', encoding='utf-8') as f:
             analysis = json.load(f)
     
-    batch_mgr = BatchGenerationManager(data_dir, output_path, analysis, novel_name)
+    # 从 project_config.json 读取 setting
+    setting = "架空古代"
+    config_path = data_dir / "project_config.json"
+    if config_path.exists():
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                proj_cfg = json.load(f)
+            setting = proj_cfg.get("setting", "架空古代")
+        except Exception:
+            pass
+    
+    batch_mgr = BatchGenerationManager(data_dir, output_path, analysis, novel_name, setting=setting)
     
     # 批次跳跃防护：检查是否跳过了前面的批次
     if batch_num > 1:
@@ -996,8 +1024,13 @@ def _generate_prompt(data_dir: Path, output_path: str, batch_num: int, novel_nam
     print(f"...(共 {len(prompt)} 字符)")
 
 
-def _validate_content(content: str, batch_num: int = 0) -> tuple:
+def _validate_content(content: str, batch_num: int = 0, setting: str = "架空古代") -> tuple:
     """验证内容是否违反世界观约束
+    
+    Args:
+        content: 要验证的文本内容
+        batch_num: 批次号
+        setting: 世界观设定名称，用于加载对应禁词
     
     Returns:
         (passed: bool, report: str)
@@ -1009,19 +1042,21 @@ def _validate_content(content: str, batch_num: int = 0) -> tuple:
     report_lines = []
     total_hits = 0
     
-    # 1. 禁词扫描（合并进化禁词）
+    # 1. 禁词扫描（合并进化禁词 + 世界观特定禁词）
+    base_forbidden = Config.get_forbidden_concepts(setting)
     try:
         from mechanisms.config_evolver import ConfigEvolver
         evolver = ConfigEvolver()
-        all_forbidden = evolver.get_all_forbidden_concepts()
+        evolved = evolver.get_evolved_forbidden_words()
+        all_forbidden = list(set(base_forbidden + evolved))
     except Exception:
-        all_forbidden = Config.FORBIDDEN_CONCEPTS
+        all_forbidden = base_forbidden
     
     forbidden_hits = []
     for concept in all_forbidden:
         count = content.count(concept)
         if count > 0:
-            evolved_tag = " [进化新增]" if concept not in Config.FORBIDDEN_CONCEPTS else ""
+            evolved_tag = " [进化新增]" if concept not in base_forbidden else ""
             forbidden_hits.append(f"  ❌ \"{concept}\" 出现 {count} 次{evolved_tag}")
             total_hits += count
     
@@ -1092,8 +1127,19 @@ def _save_batch(data_dir: Path, output_path: str, batch_num: int, content_file: 
     with open(content_file, 'r', encoding='utf-8') as f:
         content = f.read()
     
+    # 从 project_config.json 读取 setting
+    setting = "架空古代"
+    config_path = data_dir / "project_config.json"
+    if config_path.exists():
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                proj_cfg = json.load(f)
+            setting = proj_cfg.get("setting", "架空古代")
+        except Exception:
+            pass
+    
     # === 验证门禁 ===
-    passed, report = _validate_content(content, batch_num)
+    passed, report = _validate_content(content, batch_num, setting=setting)
     print(report)
     
     if not passed:
@@ -1103,9 +1149,8 @@ def _save_batch(data_dir: Path, output_path: str, batch_num: int, content_file: 
             from mechanisms.config_evolver import ConfigEvolver
             
             neg = NegativeMemory()
-            # 提取命中的禁词
-            from config import Config
-            hit_words = [c for c in Config.FORBIDDEN_CONCEPTS if c in content]
+            # 提取命中的禁词（使用当前世界观的禁词列表）
+            hit_words = [c for c in Config.get_forbidden_concepts(setting) if c in content]
             
             # 判断错误类型
             if "缺失卷号" in report or "漏卷" in report:
@@ -1175,7 +1220,7 @@ def _save_batch(data_dir: Path, output_path: str, batch_num: int, content_file: 
             novel_name=novel_name,
             batch_num=batch_num,
             draft_snippet=content,
-            tags=["群像", "架空古代"],
+            tags=["群像", setting],
             score=100
         )
     except Exception as e:
@@ -1205,7 +1250,7 @@ def _run_validate(batch_num: int, content_file: str):
         print(f"\n✅ 验证通过。")
 
 
-def _generate_character_prompt(data_dir: Path, output_path: str, novel_name: str, reference_path: str = None):
+def _generate_character_prompt(data_dir: Path, output_path: str, novel_name: str, reference_path: str = None, setting: str = "架空古代"):
     """生成核心人物设定库的 prompt"""
     
     # 加载分析结果
@@ -1262,9 +1307,9 @@ def _generate_character_prompt(data_dir: Path, output_path: str, novel_name: str
 
 【创作设定】
 - 小说名称: {novel_name}（仿写）
-- 背景: 架空古代（严禁现代/科幻/穿越元素）
-- 标签: 群像
-- 严禁: {', '.join(Config.FORBIDDEN_CONCEPTS)}
+- 背景: {setting}
+- {Config.get_setting_summary(setting)}
+- 严禁: {', '.join(Config.get_forbidden_concepts(setting))}
 - 必须: 三幕九线写作手法
 - 反派没有绝对的恶，立意高远，都是为了自己认为正确的事情
 
@@ -1283,7 +1328,7 @@ def _generate_character_prompt(data_dir: Path, output_path: str, novel_name: str
 # 《{novel_name}》仿写 · 核心人物设定库
 
 > **铁律**：所有剧情必须由以下人物的性格冲突、利益碰撞与命运交织推动。严禁机械降神。
-> **背景**：架空古代 · 群像 · 九线叙事
+> **背景**：{setting} · 群像 · 九线叙事
 
 ---
 
@@ -1458,10 +1503,22 @@ def _run_continuity_check(output_path: str):
         else:
             print(f"   ✅ 无缺失卷")
     
-    # 检查禁词
+    # 检查禁词（从 project_config.json 读取 setting）
     from config import Config
+    setting = "架空古代"
+    # 尝试从最近生成的 novel_data 下查找 project_config.json
+    for d in Path("novel_data").iterdir() if Path("novel_data").exists() else []:
+        cfg_file = d / "project_config.json"
+        if cfg_file.exists():
+            try:
+                with open(cfg_file, 'r', encoding='utf-8') as f:
+                    setting = json.load(f).get("setting", "架空古代")
+                break
+            except Exception:
+                pass
+    
     forbidden_hits = []
-    for concept in Config.FORBIDDEN_CONCEPTS:
+    for concept in Config.get_forbidden_concepts(setting):
         if concept in content:
             count = content.count(concept)
             forbidden_hits.append(f"{concept}({count}次)")
@@ -1492,7 +1549,7 @@ def _run_final_review(novel_name: str, output_path: str, data_dir: Path):
     except Exception as e:
         print(f"❌ 生成终局审查 Prompt 失败: {e}")
 
-def _run_evolve_summary(novel_name: str, output_path: str, data_dir: Path, tags: list):
+def _run_evolve_summary(novel_name: str, output_path: str, data_dir: Path, tags: list, setting: str = "架空古代"):
     """完结经验沉淀：将一本已完成小说的关键经验写入全局知识库"""
     print(f"\n🧠 [经验沉淀] 正在为《{novel_name}》生成创作经验总结...")
     
@@ -1534,7 +1591,7 @@ def _run_evolve_summary(novel_name: str, output_path: str, data_dir: Path, tags:
         
         meta.register_novel_completion(
             novel_name=novel_name,
-            setting="架空古代",
+            setting=setting,
             tags=tags,
             total_volumes=total_vols,
             key_learnings=learnings,

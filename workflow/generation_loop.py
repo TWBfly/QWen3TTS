@@ -318,7 +318,7 @@ class GenerationLoop:
         verification = self.verifier.verify_outline(bible, outline)
         
         # 硬编码禁词过滤 (Fix #12 bonus)
-        forbidden_hits = self._check_forbidden_words(outline)
+        forbidden_hits = self._check_forbidden_words(outline, bible)
         if forbidden_hits:
             print(f"  ⛔️ 禁词检测命中: {forbidden_hits}")
             verification["status"] = "REJECT"
@@ -597,11 +597,14 @@ class GenerationLoop:
         except Exception:
             return []
     
-    def _check_forbidden_words(self, outline: ChapterOutline) -> List[str]:
+    def _check_forbidden_words(self, outline: ChapterOutline, bible: StoryBible = None) -> List[str]:
         """硬编码禁词过滤 — 不依赖 LLM 自检"""
         text = f"{outline.title} {outline.summary} {outline.detailed_outline}"
+        setting = "架空古代"
+        if bible and hasattr(bible, 'background_theme') and bible.background_theme:
+            setting = bible.background_theme
         hits = []
-        for word in Config.FORBIDDEN_CONCEPTS:
+        for word in Config.get_forbidden_concepts(setting):
             if word in text:
                 hits.append(word)
         return hits

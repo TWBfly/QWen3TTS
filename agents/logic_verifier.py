@@ -72,7 +72,7 @@ class LogicVerifier(BaseAgent):
 **世界观规则**:
 {json.dumps(world_rules, ensure_ascii=False)}
 
-**违禁词检测**: 检查是否包含 {Config.FORBIDDEN_CONCEPTS}
+**违禁词检测**: 检查是否包含 {Config.get_forbidden_concepts(bible.background_theme if hasattr(bible, 'background_theme') and bible.background_theme else '架空古代')}
 
 **审查任务**:
 请像一个挑剔的逻辑学家一样，寻找以下问题：

@@ -19,8 +19,9 @@ import re
 import hashlib
 
 class AgentDriver:
-    def __init__(self, story_name: str = "default_story"):
+    def __init__(self, story_name: str = "default_story", setting: str = "架空古代"):
         self.storage = Config.get_storage_manager(story_name)
+        self.setting = setting
         self.bible_path = "story_bible_agent.json" # Use a separate bible for this task
         
     def init_story(self, title: str, protagonist_name: str, protagonist_desc: str):
@@ -32,9 +33,9 @@ class AgentDriver:
         
         bible = StoryBible(
             story_title=title,
-            genre="架空古代/群像",
+            genre=f"{self.setting}/群像",
             target_chapters=1000,
-            background_theme="架空古代",
+            background_theme=self.setting,
             writing_tags=["群像", "剧情向", "神作要求", "伏笔千里"],
             world_settings=world_settings
         )
@@ -62,17 +63,31 @@ class AgentDriver:
         print(f"Story initialized and saved to {self.bible_path}")
 
     def _create_world_settings(self):
-        from models import WorldSettings
-        ws = WorldSettings(
-            world_name="大宁王朝",
-            world_type="架空古代王朝",
-            background_theme="架空古代",
-            power_system={
-                "description": "纯粹的中医医术与传统的古代武功（低武），无玄幻法术。",
-                "stages": ["三流", "二流", "一流", "宗师"],
-                "rules": ["医武不分家", "内力辅助针灸"]
-            }
-        )
+        from models import WorldSettings, PREDEFINED_THEMES
+        
+        theme = PREDEFINED_THEMES.get(self.setting)
+        if theme:
+            ws = WorldSettings(
+                world_name=theme.era_description[:10],
+                world_type=f"{self.setting}世界",
+                background_theme=self.setting,
+                power_system={
+                    "description": theme.magic_system,
+                    "stages": [],
+                    "rules": theme.required_elements[:5]
+                }
+            )
+        else:
+            ws = WorldSettings(
+                world_name="大宁王朝",
+                world_type="架空古代王朝",
+                background_theme=self.setting,
+                power_system={
+                    "description": "纯粹的中医医术与传统的古代武功（低武），无玄幻法术。",
+                    "stages": ["三流", "二流", "一流", "宗师"],
+                    "rules": ["医武不分家", "内力辅助针灸"]
+                }
+            )
         return ws
 
     def get_prompt_for_volumes(self, start_vol, end_vol):
@@ -93,11 +108,16 @@ class AgentDriver:
         print(f"- Main Plot: {bible.main_plot_summary}")
         print(f"- Protagonist: {protagonist_name} - {protagonist_info}")
 
+        # 获取当前世界观的禁词
+        forbidden = Config.get_forbidden_concepts(self.setting)
+        
         context = f"""
 **Role**: You are the "MainAgent" (Showrunner).
 **Task**: Generate the detailed outline for Volumes {start_vol}-{end_vol} (Chapters {(start_vol-1)*10+1}-{end_vol*10}).
+**Setting**: {self.setting}
 **Constraints**: 
 {Config.STORY_CONSTRAINTS}
+**Forbidden Concepts**: {', '.join(forbidden)}
 
 **Previous Volumes Context (CRITICAL)**:
 """
@@ -353,10 +373,11 @@ def main():
     parser.add_argument("--protagonist", type=str, help="Protagonist name (for init)", default="主角")
     parser.add_argument("--desc", type=str, help="Protagonist description (for init)", default="暂无描述")
     parser.add_argument("--story", type=str, help="Story name for isolation", default="default_story")
+    parser.add_argument("--setting", type=str, help="背景设定", default="架空古代")
     
     args = parser.parse_args()
     
-    driver = AgentDriver(story_name=args.story)
+    driver = AgentDriver(story_name=args.story, setting=args.setting)
     
     # Store args on driver for use in process_input if needed
     driver.args = args

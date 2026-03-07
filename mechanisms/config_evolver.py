@@ -43,7 +43,7 @@ class ConfigEvolver:
         with open(self.db_path, 'w', encoding='utf-8') as f:
             json.dump(self._config, f, ensure_ascii=False, indent=2)
 
-    def learn_new_pattern(self, content: str, error_type: str, details: str = ""):
+    def learn_new_pattern(self, content: str, error_type: str, details: str = "", setting: str = "架空古代"):
         """
         从一次校验失败中学习新的违规模式。
 
@@ -54,10 +54,11 @@ class ConfigEvolver:
             content: 被拒绝的内容
             error_type: 错误类型
             details: 错误详情
+            setting: 当前世界观设定
         """
         from config import Config
 
-        existing_forbidden = set(Config.FORBIDDEN_CONCEPTS)
+        existing_forbidden = set(Config.get_forbidden_concepts(setting))
         existing_forbidden.update(self._config.get("evolved_forbidden_words", []))
 
         # 提取可疑词汇：出现在被拒内容中且与已有禁词共现的 2-4 字词
@@ -122,10 +123,10 @@ class ConfigEvolver:
         """获取所有通过进化机制新增的角色名正则"""
         return self._config.get("evolved_character_patterns", [])
 
-    def get_all_forbidden_concepts(self) -> List[str]:
-        """获取合并后的完整禁词列表（原始 + 进化）"""
+    def get_all_forbidden_concepts(self, setting: str = "架空古代") -> List[str]:
+        """获取合并后的完整禁词列表（世界观禁词 + 进化禁词）"""
         from config import Config
-        return list(set(Config.FORBIDDEN_CONCEPTS + self.get_evolved_forbidden_words()))
+        return list(set(Config.get_forbidden_concepts(setting) + self.get_evolved_forbidden_words()))
 
     def get_stats(self) -> Dict:
         """获取进化统计"""
